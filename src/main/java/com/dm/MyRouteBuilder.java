@@ -1,15 +1,5 @@
 package com.dm;
 
-import org.apache.camel.builder.RouteBuilder;
-import org.yaml.snakeyaml.Yaml;
-
-import java.io.InputStream;
-import java.util.List;
-import java.util.Map;
-
-/**
- * A Camel Java DSL Router
- */
 import org.apache.camel.Exchange;
 import org.apache.camel.builder.RouteBuilder;
 import org.apache.camel.model.dataformat.JsonLibrary;
@@ -47,6 +37,15 @@ public class MyRouteBuilder extends RouteBuilder {
                 .log("UK message from JSON")
                 .transform(constant("foo"))
                 .to("file:target/messages/uk?fileName=uk.txt&fileExist=Append");
+
+        from("timer:restCall?period=10000")
+            .routeId("restApiConsumer")
+            .doTry()
+                .to("http://api.publicapis.org/random")
+                .log("API Response: ${body}")
+                .to("file:target/messages?fileName=api_response.json")
+            .doCatch(Exception.class)
+                .log("Error calling API: ${exception.message}")
+            .end();
     }
-}
 }
