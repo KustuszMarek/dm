@@ -10,52 +10,47 @@ import java.util.Map;
 /**
  * A Camel Java DSL Router
  */
-import org.apache.camel.builder.RouteBuilder;
-import org.yaml.snakeyaml.Yaml;
-
-import java.io.InputStream;
-import java.util.List;
-import java.util.Map;
-
 public class MyRouteBuilder extends RouteBuilder {
 
-    public void configure() throws Exception {
+    public void configure() {
         List<String> inputDirs = loadInputDirs();
 
         for (String dir : inputDirs) {
-            from("file:" + dir + "?include=.*\\.csv&delete=true&initialDelay=1000&delay=1000")
+            from("file:" + dir + "?include=.*\\.csv&initialDelay=1000&delay=1000")
                 .routeId("route-" + new java.util.Random().nextInt())
                 .split(body().tokenize("\n")).streaming().filter(body().isNotEqualTo(""))
-                .process(exchange -> {
-                    String line = exchange.getIn().getBody(String.class);
-                    if (line == null) {
-                        return;
-                    }
-                    // Remove BOM if present
-                    if (line.startsWith("\uFEFF")) {
-                        line = line.substring(1);
-                    }
-                    line = line.strip();
-                    if (line.isEmpty()) {
-                        return;
-                    }
-
-                    String[] parts = line.split("[,;]");
-                    String code = parts.length > 0 ? parts[0].strip() : "UNKNOWN";
-                    String itemValue = parts.length > 1 ? parts[1].strip() : "";
-
-                    exchange.getIn().setHeader("code", code);
-                    exchange.getIn().setHeader("itemValue", itemValue);
-                })
+                .process(this::processLine)
                 .to("freemarker:templates/message.ftl")
                 .to("seda:aggregator");
         }
 
         from("seda:aggregator")
             .aggregate(constant(true), new GroupedBodyAggregationStrategy())
-            .completionTimeout(2000) // Complete after 2 seconds of inactivity
+            .completionTimeout(5000)
             .to("validator:classpath:Format.xsd")
-            .to("file:src/data?fileName=output.xml");
+            .to("file:interview/src/data?fileName=output.xml");
+    }
+
+    private void processLine(org.apache.camel.Exchange exchange) {
+        String line = exchange.getIn().getBody(String.class);
+        if (line == null) {
+            return;
+        }
+        // Remove BOM if present
+        if (line.startsWith("\uFEFF")) {
+            line = line.substring(1);
+        }
+        line = line.trim();
+        if (line.isEmpty()) {
+            return;
+        }
+
+        String[] parts = line.split("[,;]");
+        String code = parts.length > 0 ? parts[0].trim() : "UNKNOWN";
+        String itemValue = parts.length > 1 ? parts[1].trim() : "";
+
+        exchange.getIn().setHeader("code", code);
+        exchange.getIn().setHeader("itemValue", itemValue);
     }
 
     public static class GroupedBodyAggregationStrategy implements org.apache.camel.AggregationStrategy {
@@ -99,5 +94,4 @@ public class MyRouteBuilder extends RouteBuilder {
             throw new IllegalStateException("Cannot load inputDirs from application.yml", e);
         }
     }
-}
 }
