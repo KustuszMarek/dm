@@ -3,15 +3,13 @@ package com.dm;
 import java.io.InputStream;
 import java.util.List;
 import java.util.Map;
-import org.apache.camel.Exchange;
-import org.apache.camel.builder.RouteBuilder;
-import org.apache.camel.model.dataformat.JsonLibrary;
-import org.yaml.snakeyaml.Yaml;
 
+/**
+ * A Camel Java DSL Router
+ */
 public class MyRouteBuilder extends RouteBuilder {
 
     public void configure() {
-        // TASK 1
         List<String> inputDirs = loadInputDirs();
 
         // TASK 2
@@ -29,55 +27,6 @@ public class MyRouteBuilder extends RouteBuilder {
             .completionTimeout(5000)
             .to("validator:classpath:Format.xsd")
             .to("file:interview/src/data?fileName=output.xml");
-
-        // TASK 3
-        from("file:interview/src/data?include=.*\\.(xml|json)")
-            .routeId("mainRoute")
-            .choice()
-                .when(header(Exchange.FILE_NAME).endsWith(".xml"))
-                    .choice()
-                        .when(xpath("/person/city = 'Karlsruhe'"))
-                            .log("DE message from XML")
-                            .to("file:interview/target/messages/de")
-                        .when(xpath("/person/city = 'London'"))
-                            .log("UK message from XML")
-                            .transform(constant("foo"))
-                            .to("file:interview/target/messages/uk?fileName=uk.txt&fileExist=Append")
-                        .otherwise()
-                            .log("Other XML message")
-                            .to("file:interview/target/messages/others")
-                    .endChoice()
-                .when(header(Exchange.FILE_NAME).endsWith(".json"))
-                    .to("direct:processJson")
-            .end();
-
-        // TASK 4
-        from("direct:processJson")
-            .routeId("jsonProcessor")
-            .unmarshal().json(JsonLibrary.Jackson)
-            .filter(jsonpath("$[?(@.city == 'London')]"))
-                .log("UK message from JSON")
-                .transform(constant("foo"))
-                .to("file:interview/target/messages/uk?fileName=uk.txt&fileExist=Append");
-
-        // TASK 5
-        from("timer:restCall?period=10000")
-            .routeId("restApiConsumer")
-            .doTry()
-                .to("https://jsonplaceholder.typicode.com/posts/1")
-                .to("file:interview/target/messages?fileName=jsonplaceholder_response.json")
-            .doCatch(Exception.class)
-                .log("Error calling API: ${exception.message}")
-            .end();
-
-        from("timer:restCall?period=10000")
-            .routeId("restApiConsumerError")
-            .doTry()
-            .to("https://jsonplaceholdererror.typicode.com/posts/1")
-            .to("file:interview/target/messages?fileName=jsonplaceholder_response.json")
-            .doCatch(Exception.class)
-            .log("Error calling API: ${exception.message}")
-            .end();
     }
 
     private void processLine(org.apache.camel.Exchange exchange) {
