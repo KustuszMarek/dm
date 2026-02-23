@@ -124,7 +124,14 @@
           <mainClass>com.dm.MainApp</mainClass>
         </configuration>
       </plugin>
-
+      <plugin>
+        <groupId>org.apache.camel</groupId>
+        <artifactId>camel-maven-plugin</artifactId>
+        <version>3.20.1</version>
+        <configuration>
+          <mainClass>com.dm.MainApp</mainClass>
+        </configuration>
+      </plugin>
     </plugins>
   </build>
 
